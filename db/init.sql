@@ -1,0 +1,31 @@
+CREATE TABLE IF NOT EXISTS users (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  age        TEXT,
+  week       INTEGER NOT NULL DEFAULT 8,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS doctors (
+  id      SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name    TEXT,
+  spec    TEXT,
+  phone   TEXT,
+  clinic  TEXT,
+  addr    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS diary_entries (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  date       DATE NOT NULL,
+  emoji      TEXT,
+  mood_label TEXT,
+  text       TEXT,
+  symptoms   TEXT[],
+  activity   TEXT,
+  diet       TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (user_id, date)
+);

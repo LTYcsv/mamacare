@@ -779,17 +779,38 @@ function PhoneShell({ children }) {
 
 // ─── APP — ЕДИНЫЙ РОУТЕР ──────────────────────────────────────────────────────
 export default function MamaCare() {
-  const [screen, setScreen] = useState("welcome");
-  const [user, setUser] = useState(null);
-  const [doctor, setDoctor] = useState(null);
+  const [screen,  setScreen]  = useState("welcome");
+  const [user,    setUser]    = useState(null);
+  const [doctor,  setDoctor]  = useState(null);
   const [entries, setEntries] = useState([]);
-  const [chatMsg, setChatMsg] = useState(null);   // initialMessage для чата
-  const [toast, setToast] = useState({ text: "", on: false });
+  const [userId,  setUserId]  = useState(null);
+  const [chatMsg, setChatMsg] = useState(null);
+  const [toast,   setToast]   = useState({ text: "", on: false });
 
   const showToast = (text) => {
     setToast({ text, on: true });
     setTimeout(() => setToast(t => ({ ...t, on: false })), 2400);
   };
+
+  // Восстановить сессию из localStorage при старте
+  useEffect(() => {
+    const savedId = localStorage.getItem("mamacare_user_id");
+    if (!savedId) return;
+    fetch(`/api/users/${savedId}`)
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(({ user: u, doctor: d, entries: e }) => {
+        setUser(u);
+        setDoctor(d);
+        setEntries(normalizeEntries(e));
+        setUserId(Number(savedId));
+        setScreen("diary");
+      })
+      .catch(() => localStorage.removeItem("mamacare_user_id"));
+  }, []);
+
+  // Postgres хранит mood_label, а фронт ждёт moodLabel
+  const normalizeEntries = (rows) =>
+    rows.map(r => ({ ...r, moodLabel: r.mood_label ?? r.moodLabel }));
 
   // Алерт симптомы за последние 7 дней
   const alertSymptoms = (() => {
@@ -797,43 +818,71 @@ export default function MamaCare() {
     const wk = 7 * 86400000;
     entries
       .filter(e => Date.now() - new Date(e.date).getTime() < wk)
-      .flatMap(e => e.symptoms)
+      .flatMap(e => e.symptoms ?? [])
       .filter(s => ALERT_SYMPTOMS.includes(s))
       .forEach(s => { counts[s] = (counts[s] || 0) + 1; });
     return Object.entries(counts);
   })();
 
-  // Демо-аккаунт
+  // Демо-аккаунт (без сохранения в БД)
   const loadDemo = () => {
     setUser({ name: "Алина", age: "28", week: 20 });
     setDoctor({ name: "Иванова М.С.", spec: "Акушер-гинеколог", phone: "+7 (495) 000-00-00", clinic: "Клиника «Здоровье»" });
     const now = Date.now();
     setEntries([
-      { id: 1, date: new Date(now - 86400000 * 3).toISOString(), emoji: "🙂", moodLabel: "хорошо", text: "Небольшая тошнота с утра, прошла после завтрака.", symptoms: ["тошнота"], activity: "Прогулка 30 мин", diet: "Каша, суп, фрукты" },
-      { id: 2, date: new Date(now - 86400000 * 2).toISOString(), emoji: "😊", moodLabel: "отлично", text: "Чудесный день! Сходила на йогу.", symptoms: [], activity: "Йога 45 мин", diet: "Правильное питание" },
-      { id: 3, date: new Date(now - 86400000).toISOString(), emoji: "😐", moodLabel: "нейтрально", text: "Болела голова к вечеру. Немного отекли ноги.", symptoms: ["головная боль", "отёки"], activity: "", diet: "Обычное" },
+      { id: 1, date: new Date(now - 86400000 * 3).toISOString(), emoji: "🙂", moodLabel: "хорошо",     text: "Небольшая тошнота с утра, прошла после завтрака.", symptoms: ["тошнота"],                    activity: "Прогулка 30 мин", diet: "Каша, суп, фрукты" },
+      { id: 2, date: new Date(now - 86400000 * 2).toISOString(), emoji: "😊", moodLabel: "отлично",    text: "Чудесный день! Сходила на йогу.",                symptoms: [],                              activity: "Йога 45 мин",    diet: "Правильное питание" },
+      { id: 3, date: new Date(now - 86400000    ).toISOString(), emoji: "😐", moodLabel: "нейтрально", text: "Болела голова к вечеру. Немного отекли ноги.",    symptoms: ["головная боль", "отёки"],      activity: "",               diet: "Обычное" },
     ]);
     setScreen("diary");
     showToast("Добро пожаловать! 🌸");
   };
 
-  // Сохранение чекина
-  const saveCheckin = (data) => {
-    const today = new Date().toDateString();
-    const entry = {
-      id: Date.now(),
-      date: new Date().toISOString(),
-      emoji: data.mood.emoji,
+  // Завершить онбординг → сохранить в БД
+  const finishOnboarding = async (profileData, doctorData) => {
+    const res = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...profileData, doctor: doctorData }),
+    });
+    const newUser = await res.json();
+    localStorage.setItem("mamacare_user_id", String(newUser.id));
+    setUserId(newUser.id);
+    setUser(profileData);
+    setDoctor(doctorData ?? null);
+    setScreen("diary");
+    showToast("Добро пожаловать! 🌸");
+  };
+
+  // Сохранение чекина → POST /api/entries → обновить локальный стейт
+  const saveCheckin = async (data) => {
+    const date = new Date().toISOString().split("T")[0];
+    const body = {
+      userId,
+      date,
+      emoji:     data.mood.emoji,
       moodLabel: data.mood.label,
-      text: data.text,
-      symptoms: data.symptoms,
-      activity: data.activity,
-      diet: data.diet,
+      text:      data.text,
+      symptoms:  data.symptoms,
+      activity:  data.activity,
+      diet:      data.diet,
     };
-    setEntries(prev => [...prev.filter(e => new Date(e.date).toDateString() !== today), entry]);
+
+    const res   = await fetch("/api/entries", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const saved = await res.json();
+    const normalized = { ...saved, moodLabel: saved.mood_label };
+
+    setEntries(prev => [...prev.filter(e => e.date?.slice(0, 10) !== date), normalized]);
     const hasAlert = data.symptoms.some(s => ALERT_SYMPTOMS.includes(s));
     showToast("Запись сохранена! 🌸");
     setTimeout(() => setScreen(hasAlert ? "alert" : "diary"), 500);
+  };
+
+  // Сброс
+  const handleReset = () => {
+    localStorage.removeItem("mamacare_user_id");
+    setUser(null); setDoctor(null); setEntries([]); setUserId(null);
+    setScreen("welcome");
   };
 
   // Открыть чат
@@ -852,13 +901,20 @@ export default function MamaCare() {
         return <ScreenProfileSetup onBack={() => setScreen("welcome")} onNext={u => { setUser(u); setScreen("doctor-setup"); }} />;
 
       case "doctor-setup":
-        return <ScreenDoctorSetup onBack={() => setScreen("profile-setup")} onNext={d => { setDoctor(d); setScreen("diary"); showToast("Добро пожаловать! 🌸"); }} onSkip={() => { setScreen("diary"); showToast("Добро пожаловать! 🌸"); }} />;
+        return <ScreenDoctorSetup onBack={() => setScreen("profile-setup")} onNext={d => finishOnboarding(user, d)} onSkip={() => finishOnboarding(user, null)} />;
 
       case "diary":
         return user && <ScreenDiary user={user} entries={entries} alertSymptoms={alertSymptoms} onCheckin={() => setScreen("checkin")} onSummary={() => setScreen("summary")} onAlert={() => setScreen("alert")} onNav={setScreen} />;
 
       case "checkin":
-        return <ScreenCheckin onBack={() => setScreen("diary")} onSave={saveCheckin} />;
+        return <ScreenCheckin onBack={() => setScreen("diary")} onSave={userId ? saveCheckin : (data) => {
+          const today = new Date().toDateString();
+          const entry = { id: Date.now(), date: new Date().toISOString(), emoji: data.mood.emoji, moodLabel: data.mood.label, text: data.text, symptoms: data.symptoms, activity: data.activity, diet: data.diet };
+          setEntries(prev => [...prev.filter(e => new Date(e.date).toDateString() !== today), entry]);
+          const hasAlert = data.symptoms.some(s => ALERT_SYMPTOMS.includes(s));
+          showToast("Запись сохранена! 🌸");
+          setTimeout(() => setScreen(hasAlert ? "alert" : "diary"), 500);
+        }} />;
 
       case "summary":
         return user && <ScreenSummary onBack={() => setScreen("diary")} entries={entries} user={user} alertSymptoms={alertSymptoms} />;
@@ -873,7 +929,7 @@ export default function MamaCare() {
         return <ScreenAlert onBack={() => setScreen("diary")} onChat={() => { setChatMsg("У меня тревожные симптомы при беременности. Что делать?"); setScreen("chat"); }} alertSymptoms={alertSymptoms} doctor={doctor} entries={entries} />;
 
       case "profile":
-        return user && <ScreenProfile user={user} doctor={doctor} entries={entries} onNav={setScreen} onReset={() => { setUser(null); setDoctor(null); setEntries([]); setScreen("welcome"); }} />;
+        return user && <ScreenProfile user={user} doctor={doctor} entries={entries} onNav={setScreen} onReset={handleReset} />;
 
       default:
         return null;
