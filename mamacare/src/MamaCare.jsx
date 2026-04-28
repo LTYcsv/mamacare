@@ -181,7 +181,7 @@ function BottomNav({ active, onDiary, onAssistant, onProfile }) {
 // ─── ЭКРАНЫ ───────────────────────────────────────────────────────────────────
 
 // WELCOME
-function ScreenWelcome({ onStart, onDemo }) {
+function ScreenWelcome({ onStart }) {
   return (
     <div style={{ height: "100%", background: "linear-gradient(160deg,#F9E8E5 0%,#EEF5F2 55%,#FAF7F2 100%)", display: "flex", flexDirection: "column", padding: "72px 28px 40px", position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", width: 260, height: 260, borderRadius: "50%", top: 60, right: -80, background: "radial-gradient(circle,rgba(232,132,122,0.22) 0%,transparent 70%)", pointerEvents: "none" }} />
@@ -198,9 +198,8 @@ function ScreenWelcome({ onStart, onDemo }) {
           <span key={p} style={{ background: COLORS.white, borderRadius: 100, padding: "7px 14px", fontSize: 12, fontWeight: 500, color: COLORS.mid, boxShadow: "0 2px 8px rgba(45,36,32,0.08)" }}>{p}</span>
         ))}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: "auto" }}>
+      <div style={{ marginTop: "auto" }}>
         <Btn onClick={onStart}>Начать →</Btn>
-        <Btn variant="outline" onClick={onDemo}>У меня уже есть аккаунт</Btn>
       </div>
     </div>
   );
@@ -210,7 +209,7 @@ function ScreenWelcome({ onStart, onDemo }) {
 function ScreenProfileSetup({ onBack, onNext }) {
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
-  const [week, setWeek] = useState(8); // BUG FIX 1: начинаем с 8, min=1
+  const [week, setWeek] = useState(8);
 
   return (
     <div style={{ height: "100%", background: COLORS.cream, display: "flex", flexDirection: "column", overflowY: "auto" }}>
@@ -233,7 +232,6 @@ function ScreenProfileSetup({ onBack, onNext }) {
         <div style={{ textAlign: "center", fontFamily: "'Fraunces',serif", fontSize: 52, fontWeight: 300, color: COLORS.dark, margin: "12px 0 8px" }}>
           {week} <span style={{ fontSize: 16, color: COLORS.mid }}>нед.</span>
         </div>
-        {/* BUG FIX 1: min=1 */}
         <input type="range" min={1} max={42} value={week} onChange={e => setWeek(Number(e.target.value))}
           style={{ width: "100%", appearance: "none", height: 4, borderRadius: 100, outline: "none", cursor: "pointer", background: `linear-gradient(to right,${COLORS.rose} ${(week - 1) / 41 * 100}%,rgba(45,36,32,0.12) 0%)` }} />
         <div style={{ textAlign: "center", marginTop: 10 }}><TrimTag week={week} /></div>
@@ -293,7 +291,6 @@ function ScreenDiary({ user, entries, alertSymptoms, onCheckin, onSummary, onAle
   const todayEntry = entries.find(e => new Date(e.date).toDateString() === today);
   const recentEntries = [...entries].reverse().slice(0, 7);
   const w = user.week;
-  // BUG FIX 3: лента строится вокруг текущей недели
   const weekRange = Array.from({ length: 9 }, (_, i) => w - 4 + i).filter(x => x >= 1 && x <= 42);
 
   return (
@@ -308,7 +305,7 @@ function ScreenDiary({ user, entries, alertSymptoms, onCheckin, onSummary, onAle
         </div>
       </div>
 
-      {/* Лента недель — BUG FIX 3 */}
+      {/* Лента недель */}
       <div style={{ display: "flex", gap: 8, overflowX: "auto", padding: "10px 24px", flexShrink: 0, scrollbarWidth: "none" }}>
         {weekRange.map(n => (
           <div key={n} style={{ flexShrink: 0, width: 46, height: 52, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 14, background: n === w ? COLORS.dark : COLORS.white, color: n === w ? COLORS.white : COLORS.light, border: `1.5px solid ${n === w ? COLORS.dark : "transparent"}` }}>
@@ -411,7 +408,6 @@ function ScreenCheckin({ onBack, onSave }) {
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: "4px 24px 40px" }}>
-        {/* BUG FIX 2: все 5 в одну строку */}
         <Label style={{ marginTop: 12 }}>Настроение</Label>
         <div style={{ display: "flex", gap: 7 }}>
           {MOODS.map(m => (
@@ -583,7 +579,7 @@ function ScreenQA({ onOpenChat, onNav }) {
   );
 }
 
-// CHAT — BUG FIX 5: doSend объявлен ДО useEffect
+// CHAT
 function ScreenChat({ onBack, initialMessage, user }) {
   const greeting = `Привет, ${user?.name || "дорогая"}! 🌸 Готова ответить на любой вопрос о беременности.`;
   const [msgs, setMsgs] = useState([{ role: "assistant", text: greeting }]);
@@ -609,7 +605,6 @@ function ScreenChat({ onBack, initialMessage, user }) {
     }
   };
 
-  // BUG FIX 5: initialMessage отправляется ровно один раз
   useEffect(() => {
     if (initialMessage && !initRef.current) {
       initRef.current = true;
@@ -824,20 +819,6 @@ export default function MamaCare() {
     return Object.entries(counts);
   })();
 
-  // Демо-аккаунт (без сохранения в БД)
-  const loadDemo = () => {
-    setUser({ name: "Алина", age: "28", week: 20 });
-    setDoctor({ name: "Иванова М.С.", spec: "Акушер-гинеколог", phone: "+7 (495) 000-00-00", clinic: "Клиника «Здоровье»" });
-    const now = Date.now();
-    setEntries([
-      { id: 1, date: new Date(now - 86400000 * 3).toISOString(), emoji: "🙂", moodLabel: "хорошо",     text: "Небольшая тошнота с утра, прошла после завтрака.", symptoms: ["тошнота"],                    activity: "Прогулка 30 мин", diet: "Каша, суп, фрукты" },
-      { id: 2, date: new Date(now - 86400000 * 2).toISOString(), emoji: "😊", moodLabel: "отлично",    text: "Чудесный день! Сходила на йогу.",                symptoms: [],                              activity: "Йога 45 мин",    diet: "Правильное питание" },
-      { id: 3, date: new Date(now - 86400000    ).toISOString(), emoji: "😐", moodLabel: "нейтрально", text: "Болела голова к вечеру. Немного отекли ноги.",    symptoms: ["головная боль", "отёки"],      activity: "",               diet: "Обычное" },
-    ]);
-    setScreen("diary");
-    showToast("Добро пожаловать! 🌸");
-  };
-
   // Завершить онбординг → сохранить в БД
   const finishOnboarding = async (profileData, doctorData) => {
     const res = await fetch("/api/users", {
@@ -895,7 +876,7 @@ export default function MamaCare() {
   const renderScreen = () => {
     switch (screen) {
       case "welcome":
-        return <ScreenWelcome onStart={() => setScreen("profile-setup")} onDemo={loadDemo} />;
+        return <ScreenWelcome onStart={() => setScreen("profile-setup")} />;
 
       case "profile-setup":
         return <ScreenProfileSetup onBack={() => setScreen("welcome")} onNext={u => { setUser(u); setScreen("doctor-setup"); }} />;
@@ -907,14 +888,7 @@ export default function MamaCare() {
         return user && <ScreenDiary user={user} entries={entries} alertSymptoms={alertSymptoms} onCheckin={() => setScreen("checkin")} onSummary={() => setScreen("summary")} onAlert={() => setScreen("alert")} onNav={setScreen} />;
 
       case "checkin":
-        return <ScreenCheckin onBack={() => setScreen("diary")} onSave={userId ? saveCheckin : (data) => {
-          const today = new Date().toDateString();
-          const entry = { id: Date.now(), date: new Date().toISOString(), emoji: data.mood.emoji, moodLabel: data.mood.label, text: data.text, symptoms: data.symptoms, activity: data.activity, diet: data.diet };
-          setEntries(prev => [...prev.filter(e => new Date(e.date).toDateString() !== today), entry]);
-          const hasAlert = data.symptoms.some(s => ALERT_SYMPTOMS.includes(s));
-          showToast("Запись сохранена! 🌸");
-          setTimeout(() => setScreen(hasAlert ? "alert" : "diary"), 500);
-        }} />;
+        return <ScreenCheckin onBack={() => setScreen("diary")} onSave={saveCheckin} />;
 
       case "summary":
         return user && <ScreenSummary onBack={() => setScreen("diary")} entries={entries} user={user} alertSymptoms={alertSymptoms} />;
