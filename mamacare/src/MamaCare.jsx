@@ -46,63 +46,25 @@ const fmtShort = d => { const x = new Date(d); return `${DS[x.getDay()]}, ${x.ge
 const fmtFull  = d => { const x = new Date(d); return `${x.getDate()} ${MO[x.getMonth()]} ${x.getFullYear()}`; };
 const getTrimester = w => w <= 13 ? "I триместр" : w <= 26 ? "II триместр" : "III триместр";
 
-// ─── YANDEX AI ────────────────────────────────────────────────────────────────
-// Чат-агент: заменить тело на реальный fetch к Yandex AI Studio
+// ─── BACKEND API ──────────────────────────────────────────────────────────────
 async function callChatAgent(userText, _ctx) {
-  const apiKey = import.meta.env.VITE_YANDEX_API_KEY;
-  const agentId = import.meta.env.VITE_YANDEX_CHAT_AGENT_ID;
-  const folderId = import.meta.env.VITE_YANDEX_FOLDER_ID;
-
-  const res = await fetch("/api/yandex/v1/responses", {
+  const res = await fetch("/api/chat", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Api-Key ${apiKey}`,
-      "x-folder-id": folderId,
-    },
-    body: JSON.stringify({
-      prompt: { id: agentId },
-      input: userText,
-    }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: userText }),
   });
-
-const data = await res.json();
-const msg = data?.output?.filter(b => b.type === "message").pop();
-const text = msg?.content?.[0]?.text;
-return text || "Не удалось получить ответ.";
+  const data = await res.json();
+  return data.reply || "Не удалось получить ответ.";
 }
 
-// Агент анализа дневника: заменить тело на реальный fetch
 async function callSummaryAgent(entries, ctx) {
-  await new Promise(r => setTimeout(r, 1400 + Math.random() * 600));
-
-  if (!entries || entries.length === 0)
-    return "За эту неделю записей нет. Начните вести дневник — даже короткие заметки помогут отслеживать самочувствие. 🌸";
-
-  const scores = entries.map(e => MOODS.find(m => m.label === e.moodLabel)?.score || 3);
-  const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-  const symCounts = {};
-  entries.flatMap(e => e.symptoms).forEach(s => { symCounts[s] = (symCounts[s] || 0) + 1; });
-  const topSym = Object.entries(symCounts).sort((a, b) => b[1] - a[1]);
-  const alertFound = topSym.filter(([s]) => ALERT_SYMPTOMS.includes(s));
-  const actDays = entries.filter(e => e.activity?.trim()).length;
-  const goodDays = entries.filter(e => ["отлично", "хорошо"].includes(e.moodLabel)).length;
-
-  let t = `Проанализировала ${entries.length} записей на ${ctx?.week} неделе беременности.\n\n`;
-  t += `📊 Средний балл: ${avg}/5 — ${goodDays} из ${entries.length} дней с хорошим настроением.\n\n`;
-  if (topSym.length > 0) {
-    t += `🔍 Частые симптомы:\n`;
-    topSym.slice(0, 3).forEach(([s, c]) => { t += `— ${s}: ${c} раз${c > 1 ? "а" : ""}\n`; });
-    t += "\n";
-  }
-  t += actDays > 0
-    ? `🚶 Физическая активность: ${actDays} из ${entries.length} дней — отлично!\n\n`
-    : `🚶 Физическая активность не зафиксирована. Лёгкие прогулки по 20–30 мин очень полезны.\n\n`;
-  t += `💡 Рекомендации:\n`;
-  if (alertFound.length > 0) t += `— ⚠️ ${alertFound.map(([s]) => s).join(", ")} — обсудите с врачом\n`;
-  t += `— Поддерживайте сон 8–9 часов\n— Пейте 1.5–2 л воды в день\n`;
-  t += `\n⚕️ Анализ носит информационный характер и не заменяет консультацию врача.`;
-  return t;
+  const res = await fetch("/api/summary", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ entries, week: ctx?.week }),
+  });
+  const data = await res.json();
+  return data.summary;
 }
 
 // ─── UI БЛОКИ ─────────────────────────────────────────────────────────────────

@@ -5,11 +5,9 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/api/yandex': {
-        target: 'https://ai.api.cloud.yandex.net',
+      '/api': {
+        target: 'http://localhost:3001',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/yandex/, ''),
-        secure: true,
       }
     }
   }
