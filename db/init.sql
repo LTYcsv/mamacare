@@ -1,14 +1,17 @@
 CREATE TABLE IF NOT EXISTS users (
-  id         SERIAL PRIMARY KEY,
-  name       TEXT NOT NULL,
-  age        TEXT,
-  week       INTEGER NOT NULL DEFAULT 8,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  id               SERIAL PRIMARY KEY,
+  email            TEXT UNIQUE NOT NULL,
+  password_hash    TEXT NOT NULL,
+  name             TEXT,
+  age              TEXT,
+  week             INTEGER DEFAULT 8,
+  profile_complete BOOLEAN DEFAULT FALSE,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS doctors (
   id      SERIAL PRIMARY KEY,
-  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  user_id INTEGER UNIQUE REFERENCES users(id) ON DELETE CASCADE,
   name    TEXT,
   spec    TEXT,
   phone   TEXT,

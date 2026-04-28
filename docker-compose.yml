@@ -1,4 +1,11 @@
 services:
+  frontend:
+    build: ./mamacare
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
   backend:
     build: ./backend
     ports:
