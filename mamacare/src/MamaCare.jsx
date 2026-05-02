@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { COLORS, ALERT_SYMPTOMS } from "./constants";
-import { Toast, PhoneShell } from "./components";
+import { Toast } from "./components";
 import { apiRefresh, apiLogout, apiFetchMe, apiSaveProfile, apiSaveEntry } from "./lib/api";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
@@ -133,22 +133,66 @@ export default function MamaCare() {
   };
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: "100vh", background: "#E8E3DC", padding: "40px 20px", fontFamily: "'DM Sans',sans-serif" }}>
+    <div className="mc-page">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap');
         @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { display: none; }
         input[type=range] { appearance: none; height: 4px; border-radius: 100px; outline: none; cursor: pointer; }
         input[type=range]::-webkit-slider-thumb { appearance: none; width: 22px; height: 22px; background: #E8847A; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(232,132,122,0.45); }
+
+        .mc-page {
+          font-family: 'DM Sans', sans-serif;
+          background: #FAF7F2;
+          min-height: 100dvh;
+        }
+        .mc-app {
+          width: 100%;
+          height: 100dvh;
+          position: relative;
+          overflow: hidden;
+          background: #FAF7F2;
+        }
+        .mc-screen {
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          animation: fadeIn 0.22s ease;
+        }
+
+        @media (min-width: 480px) {
+          .mc-page {
+            background: #E8E3DC;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 24px 16px;
+          }
+          .mc-app {
+            max-width: 480px;
+            height: calc(100dvh - 48px);
+            border-radius: 24px;
+            box-shadow: 0 8px 40px rgba(45,36,32,0.14);
+            overflow: hidden;
+          }
+        }
+
+        @media (min-width: 768px) {
+          .mc-page {
+            padding: 40px 20px;
+            align-items: center;
+          }
+          .mc-app {
+            height: calc(100dvh - 80px);
+          }
+        }
       `}</style>
-      <PhoneShell>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, animation: "fadeIn 0.22s ease" }} key={screen}>
+      <div className="mc-app">
+        <div className="mc-screen" key={screen}>
           {renderScreen()}
         </div>
         <Toast msg={toast.text} visible={toast.on} />
-      </PhoneShell>
+      </div>
     </div>
   );
 }

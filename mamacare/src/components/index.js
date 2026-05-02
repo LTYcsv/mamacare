@@ -6,4 +6,3 @@ export { Chip } from "./Chip";
 export { TrimTag } from "./TrimTag";
 export { Toast } from "./Toast";
 export { BottomNav } from "./BottomNav";
-export { PhoneShell } from "./PhoneShell";
