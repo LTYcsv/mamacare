@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import ReactMarkdown from "react-markdown";
 import { COLORS } from "../constants";
 import { BackBtn } from "../components";
 import { callChatAgent } from "../lib/api";
@@ -10,7 +11,7 @@ export function Chat({ onBack, initialMessage, user }) {
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef(null);
   const busyRef = useRef(false);
-  const initRef = useRef(false);
+  const lastInitialRef = useRef();
 
   const doSend = async (text) => {
     if (!text.trim() || busyRef.current) return;
@@ -18,8 +19,11 @@ export function Chat({ onBack, initialMessage, user }) {
     setMsgs(m => [...m, { role: "user", text }]);
     setTyping(true);
     try {
-      const reply = await callChatAgent(text, { week: user?.week });
+      const reply = await callChatAgent(text);
       setMsgs(m => [...m, { role: "assistant", text: reply }]);
+    } catch (err) {
+      console.error("chat error:", err);
+      setMsgs(m => [...m, { role: "assistant", text: "Не удалось связаться с сервером. Попробуйте ещё раз через минуту." }]);
     } finally {
       setTyping(false);
       busyRef.current = false;
@@ -27,11 +31,11 @@ export function Chat({ onBack, initialMessage, user }) {
   };
 
   useEffect(() => {
-    if (initialMessage && !initRef.current) {
-      initRef.current = true;
+    if (initialMessage && initialMessage !== lastInitialRef.current) {
+      lastInitialRef.current = initialMessage;
       doSend(initialMessage);
     }
-  }, []);
+  }, [initialMessage]);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [msgs, typing]);
 
@@ -48,7 +52,7 @@ export function Chat({ onBack, initialMessage, user }) {
         <BackBtn onClick={onBack} />
         <div style={{ width: 38, height: 38, borderRadius: 13, background: `linear-gradient(135deg,${COLORS.rose},#C26E65)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🤱</div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.dark }}>MamaCare AI</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: COLORS.dark }}>Мия</div>
           <div style={{ fontSize: 11, color: typing ? COLORS.rose : COLORS.sage }}>{typing ? "● Печатает..." : "● Онлайн · Доказательная медицина"}</div>
         </div>
       </div>
@@ -60,8 +64,8 @@ export function Chat({ onBack, initialMessage, user }) {
               <div style={{ width: 26, height: 26, borderRadius: 9, flexShrink: 0, background: `linear-gradient(135deg,${COLORS.rose},#C26E65)`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>🤱</div>
             )}
             <div style={{ maxWidth: "76%" }}>
-              <div style={{ padding: "11px 15px", borderRadius: 18, fontSize: 14, lineHeight: 1.55, whiteSpace: "pre-line", background: m.role === "user" ? COLORS.dark : COLORS.white, color: m.role === "user" ? COLORS.white : COLORS.dark, borderBottomLeftRadius: m.role === "assistant" ? 5 : 18, borderBottomRightRadius: m.role === "user" ? 5 : 18, boxShadow: m.role === "assistant" ? "0 2px 8px rgba(45,36,32,0.06)" : "none" }}>
-                {m.text}
+              <div style={{ padding: "11px 15px", borderRadius: 18, fontSize: 14, lineHeight: 1.55, background: m.role === "user" ? COLORS.dark : COLORS.white, color: m.role === "user" ? COLORS.white : COLORS.dark, borderBottomLeftRadius: m.role === "assistant" ? 5 : 18, borderBottomRightRadius: m.role === "user" ? 5 : 18, boxShadow: m.role === "assistant" ? "0 2px 8px rgba(45,36,32,0.06)" : "none" }}>
+                {m.role === "assistant" ? <ReactMarkdown skipHtml>{m.text}</ReactMarkdown> : m.text}
               </div>
               {m.role === "assistant" && i > 0 && <div style={{ fontSize: 10, color: COLORS.light, marginTop: 3 }}>⚕️ Информационный ответ. AI не ставит диагнозы.</div>}
             </div>

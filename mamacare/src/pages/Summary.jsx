@@ -12,7 +12,7 @@ export function Summary({ onBack, entries, user, alertSymptoms }) {
 
   useEffect(() => {
     setLoading(true);
-    callSummaryAgent(recent, user).then(r => { setResult(r); setLoading(false); });
+    callSummaryAgent().then(r => { setResult(r); setLoading(false); });
   }, []);
 
   return (

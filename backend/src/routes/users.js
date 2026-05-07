@@ -1,11 +1,26 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import pool from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { validate } from '../middleware/validate.js'
 
 const router = Router()
 
+const profileSchema = z.object({
+  name: z.string().trim().min(1).max(50),
+  age: z.number().int().min(0).max(120).nullish(),
+  week: z.number().int().min(1).max(42),
+  doctor: z.object({
+    name:   z.string().trim().min(1).max(100),
+    spec:   z.string().trim().max(100).optional(),
+    phone:  z.string().trim().max(30).optional(),
+    clinic: z.string().trim().max(100).optional(),
+    addr:   z.string().trim().max(200).optional(),
+  }).nullish(),
+})
+
 // POST /api/users/profile — заполнить анкету после регистрации
-router.post('/profile', requireAuth, async (req, res) => {
+router.post('/profile', requireAuth, validate(profileSchema), async (req, res) => {
   const { name, age, week, doctor } = req.body
   const userId = req.userId
   const client = await pool.connect()

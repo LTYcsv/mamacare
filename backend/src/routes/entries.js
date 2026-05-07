@@ -1,11 +1,26 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import pool from '../db.js'
 import { requireAuth } from '../middleware/auth.js'
+import { validate } from '../middleware/validate.js'
 
 const router = Router()
 
+const MOOD_LABELS = ['отлично', 'хорошо', 'нейтрально', 'плохо', 'ужасно']
+const SYMPTOM_KEYS = ['тошнота', 'усталость', 'головная боль', 'отёки', 'изжога', 'боль в спине', 'нарушение сна', 'тревога']
+
+const entrySchema = z.object({
+  date:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  emoji:     z.string().max(8),
+  moodLabel: z.enum(MOOD_LABELS),
+  text:      z.string().max(2000).optional().default(''),
+  symptoms:  z.array(z.enum(SYMPTOM_KEYS)).max(SYMPTOM_KEYS.length).optional().default([]),
+  activity:  z.string().max(500).optional().default(''),
+  diet:      z.string().max(500).optional().default(''),
+})
+
 // POST /api/entries — создать или обновить запись за дату (upsert)
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, validate(entrySchema), async (req, res) => {
   const { date, emoji, moodLabel, text, symptoms, activity, diet } = req.body
   const userId = req.userId
 

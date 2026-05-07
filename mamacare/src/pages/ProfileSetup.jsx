@@ -32,7 +32,7 @@ export function ProfileSetup({ onBack, onNext }) {
         <div style={{ textAlign: "center", marginTop: 10 }}><TrimTag week={week} /></div>
 
         <div style={{ marginTop: 28 }}>
-          <Btn onClick={() => name.trim() && onNext({ name: name.trim(), age, week })} disabled={!name.trim()}>Далее →</Btn>
+          <Btn onClick={() => name.trim() && onNext({ name: name.trim(), age: Number(age) || null, week })} disabled={!name.trim()}>Далее →</Btn>
         </div>
       </div>
     </div>

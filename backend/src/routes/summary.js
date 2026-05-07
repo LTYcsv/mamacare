@@ -1,4 +1,6 @@
 import { Router } from 'express'
+import pool from '../db.js'
+import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
 
@@ -11,25 +13,39 @@ const MOODS = [
 ]
 const ALERT_SYMPTOMS = ['головная боль', 'отёки', 'тревога', 'нарушение сна']
 
-router.post('/', async (req, res) => {
-  const { entries, week } = req.body
+router.post('/', requireAuth, async (req, res) => {
+  const userId = req.userId
 
-  if (!entries || entries.length === 0) {
+  const [userRes, entriesRes] = await Promise.all([
+    pool.query('SELECT week FROM users WHERE id = $1', [userId]),
+    pool.query(
+      `SELECT mood_label, symptoms, activity
+         FROM diary_entries
+        WHERE user_id = $1
+          AND date >= CURRENT_DATE - INTERVAL '7 days'`,
+      [userId]
+    ),
+  ])
+
+  const week = userRes.rows[0]?.week ?? 8
+  const entries = entriesRes.rows
+
+  if (entries.length === 0) {
     return res.json({
       summary: 'За эту неделю записей нет. Начните вести дневник — даже короткие заметки помогут отслеживать самочувствие. 🌸',
     })
   }
 
-  const scores = entries.map(e => MOODS.find(m => m.label === e.moodLabel)?.score ?? 3)
+  const scores = entries.map(e => MOODS.find(m => m.label === e.mood_label)?.score ?? 3)
   const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
 
   const symCounts = {}
-  entries.flatMap(e => e.symptoms).forEach(s => { symCounts[s] = (symCounts[s] || 0) + 1 })
+  entries.flatMap(e => e.symptoms ?? []).forEach(s => { symCounts[s] = (symCounts[s] || 0) + 1 })
   const topSym = Object.entries(symCounts).sort((a, b) => b[1] - a[1])
   const alertFound = topSym.filter(([s]) => ALERT_SYMPTOMS.includes(s))
 
   const actDays = entries.filter(e => e.activity?.trim()).length
-  const goodDays = entries.filter(e => ['отлично', 'хорошо'].includes(e.moodLabel)).length
+  const goodDays = entries.filter(e => ['отлично', 'хорошо'].includes(e.mood_label)).length
 
   let t = `Проанализировала ${entries.length} записей на ${week} неделе беременности.\n\n`
   t += `📊 Средний балл: ${avg}/5 — ${goodDays} из ${entries.length} дней с хорошим настроением.\n\n`

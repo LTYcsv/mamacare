@@ -1,47 +1,70 @@
-function authHeaders(token) {
-  return { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
+let _accessToken = null;
+let _onAuthFailure = null;
+
+export function setAccessToken(token) {
+  _accessToken = token;
 }
 
-export async function callChatAgent(userText, _ctx) {
-  const res = await fetch("/api/chat", {
+export function setAuthFailureHandler(fn) {
+  _onAuthFailure = fn;
+}
+
+function buildOptions(options) {
+  const headers = { ...(options.headers || {}) };
+  if (options.body && !headers["Content-Type"]) headers["Content-Type"] = "application/json";
+  if (_accessToken) headers.Authorization = `Bearer ${_accessToken}`;
+  return { ...options, headers };
+}
+
+async function apiFetch(url, options = {}) {
+  let res = await fetch(url, buildOptions(options));
+  if (res.status !== 401) return res;
+
+  const newToken = await apiRefresh();
+  if (!newToken) {
+    _onAuthFailure?.();
+    return res;
+  }
+  _accessToken = newToken;
+
+  res = await fetch(url, buildOptions(options));
+  if (res.status === 401) _onAuthFailure?.();
+  return res;
+}
+
+export async function callChatAgent(userText) {
+  const res = await apiFetch("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ input: userText }),
   });
   const data = await res.json();
   return data.reply || "Не удалось получить ответ.";
 }
 
-export async function callSummaryAgent(entries, ctx) {
-  const res = await fetch("/api/summary", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ entries, week: ctx?.week }),
-  });
+export async function callSummaryAgent() {
+  const res = await apiFetch("/api/summary", { method: "POST" });
   const data = await res.json();
   return data.summary;
 }
 
-export async function apiFetchMe(token) {
-  const res = await fetch("/api/users/me", { headers: authHeaders(token) });
+export async function apiFetchMe() {
+  const res = await apiFetch("/api/users/me");
   if (!res.ok) throw new Error("failed to load user");
   return res.json();
 }
 
-export async function apiSaveProfile(token, profileData, doctorData) {
-  const res = await fetch("/api/users/profile", {
+export async function apiSaveProfile(profileData, doctorData) {
+  const res = await apiFetch("/api/users/profile", {
     method: "POST",
-    headers: authHeaders(token),
     body: JSON.stringify({ ...profileData, doctor: doctorData }),
   });
   if (!res.ok) throw new Error("failed to save profile");
   return res.json();
 }
 
-export async function apiSaveEntry(token, body) {
-  const res = await fetch("/api/entries", {
+export async function apiSaveEntry(body) {
+  const res = await apiFetch("/api/entries", {
     method: "POST",
-    headers: authHeaders(token),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("failed to save entry");

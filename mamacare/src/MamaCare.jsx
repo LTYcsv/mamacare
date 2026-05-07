@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { COLORS, ALERT_SYMPTOMS } from "./constants";
 import { Toast } from "./components";
-import { apiRefresh, apiLogout, apiFetchMe, apiSaveProfile, apiSaveEntry } from "./lib/api";
+import { apiRefresh, apiLogout, apiFetchMe, apiSaveProfile, apiSaveEntry, setAccessToken, setAuthFailureHandler } from "./lib/api";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { ProfileSetup } from "./pages/ProfileSetup";
@@ -16,7 +16,6 @@ import { Profile } from "./pages/Profile";
 
 export default function MamaCare() {
   const [screen,  setScreen]  = useState("loading");
-  const [token,   setToken]   = useState(null);
   const [user,    setUser]    = useState(null);
   const [doctor,  setDoctor]  = useState(null);
   const [entries, setEntries] = useState([]);
@@ -31,13 +30,18 @@ export default function MamaCare() {
   const normalizeEntries = (rows) =>
     rows.map(r => ({ ...r, moodLabel: r.mood_label ?? r.moodLabel }));
 
-  // При старте — пробуем тихий refresh через httpOnly cookie
+  // При старте — регистрируем reset-on-auth-failure и пробуем тихий refresh
   useEffect(() => {
+    setAuthFailureHandler(() => {
+      setAccessToken(null);
+      setUser(null); setDoctor(null); setEntries([]);
+      setScreen("login");
+    });
     apiRefresh()
       .then(async (accessToken) => {
         if (!accessToken) { setScreen("login"); return; }
-        setToken(accessToken);
-        const { user: u, doctor: d, entries: e } = await apiFetchMe(accessToken);
+        setAccessToken(accessToken);
+        const { user: u, doctor: d, entries: e } = await apiFetchMe();
         setUser(u); setDoctor(d); setEntries(normalizeEntries(e));
         setScreen(u.profile_complete ? "diary" : "profile-setup");
       })
@@ -46,9 +50,9 @@ export default function MamaCare() {
 
   // После успешного логина или регистрации
   const handleAuthSuccess = async (accessToken, userInfo) => {
-    setToken(accessToken);
+    setAccessToken(accessToken);
     if (userInfo.profile_complete) {
-      const { user: u, doctor: d, entries: e } = await apiFetchMe(accessToken);
+      const { user: u, doctor: d, entries: e } = await apiFetchMe();
       setUser(u); setDoctor(d); setEntries(normalizeEntries(e));
       setScreen("diary");
     } else {
@@ -57,7 +61,7 @@ export default function MamaCare() {
     }
   };
 
-  const alertSymptoms = (() => {
+  const alertSymptoms = useMemo(() => {
     const counts = {};
     const wk = 7 * 86400000;
     entries
@@ -66,12 +70,12 @@ export default function MamaCare() {
       .filter(s => ALERT_SYMPTOMS.includes(s))
       .forEach(s => { counts[s] = (counts[s] || 0) + 1; });
     return Object.entries(counts);
-  })();
+  }, [entries]);
 
   // Завершить онбординг → сохранить анкету в БД
   const finishOnboarding = async (profileData, doctorData) => {
-    await apiSaveProfile(token, profileData, doctorData);
-    const { user: u, doctor: d, entries: e } = await apiFetchMe(token);
+    await apiSaveProfile(profileData, doctorData);
+    const { user: u, doctor: d, entries: e } = await apiFetchMe();
     setUser(u); setDoctor(d); setEntries(normalizeEntries(e));
     setScreen("diary");
     showToast("Добро пожаловать! 🌸");
@@ -80,7 +84,7 @@ export default function MamaCare() {
   // Сохранение чекина
   const saveCheckin = async (data) => {
     const date = new Date().toISOString().split("T")[0];
-    const saved = await apiSaveEntry(token, {
+    const saved = await apiSaveEntry({
       date,
       emoji:     data.mood.emoji,
       moodLabel: data.mood.label,
@@ -98,7 +102,8 @@ export default function MamaCare() {
 
   const handleLogout = async () => {
     await apiLogout();
-    setToken(null); setUser(null); setDoctor(null); setEntries([]);
+    setAccessToken(null);
+    setUser(null); setDoctor(null); setEntries([]);
     setScreen("login");
   };
 
@@ -125,7 +130,7 @@ export default function MamaCare() {
       case "checkin":       return <Checkin onBack={() => setScreen("diary")} onSave={saveCheckin} />;
       case "summary":       return user && <Summary onBack={() => setScreen("diary")} entries={entries} user={user} alertSymptoms={alertSymptoms} />;
       case "qa":            return <QA onOpenChat={openChat} onNav={setScreen} />;
-      case "chat":          return user && <Chat key={chatMsg} onBack={() => setScreen("qa")} initialMessage={chatMsg} user={user} />;
+      case "chat":          return user && <Chat onBack={() => setScreen("qa")} initialMessage={chatMsg} user={user} />;
       case "alert":         return <Alert onBack={() => setScreen("diary")} onChat={() => { setChatMsg("У меня тревожные симптомы при беременности. Что делать?"); setScreen("chat"); }} alertSymptoms={alertSymptoms} doctor={doctor} entries={entries} />;
       case "profile":       return user && <Profile user={user} doctor={doctor} entries={entries} onNav={setScreen} onReset={handleLogout} />;
       default:              return null;
