@@ -1,0 +1,13 @@
+feat: connect PostgreSQL — persist users, doctors, diary entries
+
+- db/init.sql: schema (users, doctors, diary_entries with UNIQUE per day)
+- backend/src/db.js: pg Pool via DATABASE_URL
+- POST /api/users: create user + optional doctor (transaction)
+- GET  /api/users/:id: fetch user + doctor + all entries
+- POST /api/entries: upsert diary entry per day (ON CONFLICT DO UPDATE)
+- GET  /api/entries?userId=: list entries
+- docker-compose: mount init.sql as initdb script, postgres on port 5433
+- MamaCare.jsx: localStorage stores user_id, restore session on mount,
+  saveCheckin → POST /api/entries, finishOnboarding → POST /api/users
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
