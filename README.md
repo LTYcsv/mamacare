@@ -1,5 +1,17 @@
 # MamaCare
 
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 19"/>
+  <img src="https://img.shields.io/badge/Vite-8.0_beta-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8"/>
+  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js"/>
+  <img src="https://img.shields.io/badge/Express-4.21-000000?style=flat-square&logo=express&logoColor=white" alt="Express"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"/>
+  <img src="https://img.shields.io/badge/JWT-Auth-000000?style=flat-square&logo=jsonwebtokens&logoColor=white" alt="JWT"/>
+  <img src="https://img.shields.io/badge/Zod-4.4-3068B7?style=flat-square" alt="Zod"/>
+  <img src="https://img.shields.io/badge/license-Proprietary-red?style=flat-square" alt="Proprietary"/>
+</p>
+
 Персональный дневник беременности с AI-ассистентом.
 
 ---
