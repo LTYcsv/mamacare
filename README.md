@@ -1,97 +1,197 @@
-# MamaCare
+<h1 align="center">🤰 MamaCare</h1>
 
-Личный дневник беременности с AI-ассистентом на базе Yandex AI Studio.
+<p align="center">
+  <strong>A full-stack pregnancy diary with an AI assistant</strong><br/>
+  Daily check-ins · Week tracker · Symptom alerts · AI chat
+</p>
 
-![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-8.0-646CFF?logo=vite&logoColor=white)
-![License](https://img.shields.io/badge/license-MIT-green)
+<p align="center">
+  <img src="https://img.shields.io/badge/React-19.2-61DAFB?style=flat-square&logo=react&logoColor=white" alt="React 19"/>
+  <img src="https://img.shields.io/badge/Vite-8.0_beta-646CFF?style=flat-square&logo=vite&logoColor=white" alt="Vite 8"/>
+  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js"/>
+  <img src="https://img.shields.io/badge/Express-4.21-000000?style=flat-square&logo=express&logoColor=white" alt="Express"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Docker"/>
+  <img src="https://img.shields.io/badge/JWT-Auth-000000?style=flat-square&logo=jsonwebtokens&logoColor=white" alt="JWT"/>
+  <img src="https://img.shields.io/badge/Zod-4.4-3068B7?style=flat-square" alt="Zod"/>
+  <img src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square" alt="MIT"/>
+</p>
 
-## Что умеет
+---
 
-- **Дневник** — ежедневный чекин: настроение (5 уровней), 8 симптомов, заметки о самочувствии, активности и питании
-- **Трекер недели** — текущая неделя беременности (1–42) и триместр
-- **AI-анализ** — еженедельное резюме по записям дневника
-- **AI-чат** — ответы на вопросы по доказательной медицине (Yandex AI Studio)
-- **Алерты** — автоматическое обнаружение тревожных симптомов с выводом контакта врача
-- **Карточка врача** — имя, специализация, телефон, клиника
+## Features
 
-## Быстрый старт
+| Screen | Description |
+|--------|-------------|
+| **Daily check-in** | Mood (5 levels), 8 symptom toggles, notes on well-being, activity, nutrition |
+| **Week tracker** | Current pregnancy week (1–42) and trimester with visual progress |
+| **AI chat** | Evidence-based Q&A via Yandex AI Studio — routed through the backend, API key never reaches the browser |
+| **Weekly summary** | AI-generated digest of diary entries for the current week |
+| **Symptom alerts** | Automatic detection of warning symptoms → shows doctor contact immediately |
+| **Doctor card** | Name, specialty, phone number, clinic |
+| **Auth** | JWT access token + httpOnly refresh cookie with rotation and reuse detection |
 
-### Требования
+---
 
-- Node.js 18+
-- npm 9+
-- Аккаунт [Yandex Cloud](https://cloud.yandex.ru/) с настроенным AI Studio агентом
+## Architecture
 
-### Установка
+```
+┌─────────────────────────────────────────────┐
+│              Browser (SPA)                  │
+│  React 19 · Vite 8 · Zero UI libraries      │
+│  Access token in memory · apiFetch + 401     │
+└──────────────────┬──────────────────────────┘
+                   │ REST /api/*
+┌──────────────────▼──────────────────────────┐
+│           Express 4 (Node.js)               │
+│  Helmet · CORS · Rate-limit · Zod validate  │
+│  JWT middleware · Refresh-rotation          │
+│  /api/chat  →  Yandex AI Studio (proxy)     │
+└─────────┬────────────────────────┬──────────┘
+          │ pg                     │ HTTPS
+┌─────────▼──────────┐   ┌─────────▼──────────┐
+│   PostgreSQL 16     │   │  Yandex AI Studio  │
+│  users · entries    │   │  (chat agent)      │
+│  refresh_tokens     │   └────────────────────┘
+└────────────────────┘
+```
+
+All three services are wired with **Docker Compose**:
+`docker compose up` → postgres, backend, and a production-built Nginx frontend.
+
+---
+
+## Security highlights
+
+- **Refresh token rotation** — every `/auth/refresh` atomically revokes the previous `jti`; reuse of a revoked token revokes *all* tokens for that user
+- **httpOnly cookie** — refresh token is never accessible from JS; `__Host-` prefix enforced in production
+- **Helmet** — security headers on every response
+- **Rate limiting** — `express-rate-limit` on all API routes
+- **Zod schemas** — every route validates the request body before touching the database
+- **bcrypt** — passwords hashed (cost factor 10)
+- **AI key isolation** — Yandex API key lives in `backend/.env` only; the frontend never sees it
+
+---
+
+## Quick start
+
+### With Docker (recommended)
 
 ```bash
 git clone https://github.com/LTYcsv/mamacare.git
-cd mamacare/mamacare
-npm install
+cd mamacare
+
+# Fill in env files
+cp backend/.env.example backend/.env   # add JWT_SECRET and YANDEX_* keys
+# edit root .env: POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
+
+docker compose up --build
 ```
 
-### Настройка окружения
+App → `http://localhost:5173` · API → `http://localhost:3001`
+
+### Manual (dev)
 
 ```bash
-cp .env.example .env
+# 1. Start PostgreSQL (or point DATABASE_URL at an existing instance)
+
+# 2. Backend
+cd backend && npm install && npm run dev
+
+# 3. Frontend (new terminal)
+cd mamacare && npm install && npm run dev
 ```
 
-Заполните `.env`:
+---
 
-```
-VITE_YANDEX_API_KEY=your_api_key_here
-VITE_YANDEX_FOLDER_ID=your_folder_id_here
-VITE_YANDEX_CHAT_AGENT_ID=your_agent_id_here
-```
+## Environment variables
 
-Как получить значения:
-1. Создайте API-ключ в [Yandex Cloud IAM](https://console.cloud.yandex.ru/iam)
-2. Folder ID — в настройках облака
-3. Agent ID — из [Yandex AI Studio](https://studio.yandex.cloud/) после создания агента
+**`backend/.env`**
 
-### Запуск
+| Variable | Description |
+|---|---|
+| `JWT_SECRET` | Random secret for signing JWTs (min 32 chars) |
+| `YANDEX_API_KEY` | Yandex Cloud IAM API key |
+| `YANDEX_FOLDER_ID` | Yandex Cloud folder ID |
+| `YANDEX_CHAT_AGENT_ID` | AI Studio agent ID |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `FRONTEND_URL` | Origin allowed by CORS (e.g. `http://localhost:5173`) |
 
-```bash
-npm run dev
-```
+**Root `.env`** — `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` (used by Docker Compose)
 
-Откроется `http://localhost:5173`. Для быстрой демонстрации нажмите «У меня уже есть аккаунт» на экране приветствия.
+---
 
-## Команды
+## API
 
-| Команда | Действие |
-|---------|---------|
-| `npm run dev` | Dev-сервер с HMR |
-| `npm run build` | Production-сборка в `/dist` |
-| `npm run preview` | Просмотр production-сборки |
-| `npm run lint` | ESLint проверка |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/api/auth/register` | — | Create account |
+| POST | `/api/auth/login` | — | Login → access token + refresh cookie |
+| POST | `/api/auth/refresh` | cookie | Rotate refresh token |
+| POST | `/api/auth/logout` | cookie | Revoke refresh token |
+| GET / PUT | `/api/users/me` | Bearer | Profile (name, week, doctor) |
+| GET / PUT | `/api/entries/:date` | Bearer | Diary entry — upsert by `(user_id, date)` |
+| GET | `/api/entries` | Bearer | List entries |
+| POST | `/api/chat` | Bearer | Proxy to Yandex AI Studio |
+| GET | `/api/summary` | Bearer | AI weekly summary |
 
-## Структура проекта
+---
+
+## Project structure
 
 ```
 MamaCare/
-├── mamacare/
-│   ├── src/
-│   │   ├── MamaCare.jsx   # Всё приложение (компоненты, экраны, логика)
-│   │   ├── main.jsx       # Точка входа React
-│   │   └── App.jsx        # Корневой компонент
-│   ├── index.html
-│   ├── vite.config.js     # Конфиг Vite + proxy для Yandex AI
-│   └── .env.example       # Шаблон переменных окружения
-└── CLAUDE.md              # Инструкции для AI-ассистента
+├── docker-compose.yml
+├── db/
+│   └── init.sql                  # Schema: users, entries, refresh_tokens
+├── backend/
+│   ├── Dockerfile
+│   └── src/
+│       ├── index.js              # Express app, Helmet, CORS, rate-limit
+│       ├── db.js                 # pg Pool
+│       ├── middleware/
+│       │   └── auth.js           # requireAuth, validate (Zod)
+│       └── routes/
+│           ├── auth.js           # register · login · refresh · logout
+│           ├── users.js          # profile CRUD
+│           ├── entries.js        # diary entries
+│           ├── chat.js           # Yandex AI proxy
+│           └── summary.js        # AI weekly digest
+└── mamacare/
+    ├── Dockerfile
+    └── src/
+        ├── main.jsx
+        ├── App.jsx
+        ├── lib/
+        │   └── apiFetch.js       # Fetch wrapper: silent 401 → refresh → retry
+        ├── constants.js          # Symptom list, mood labels
+        └── pages/
+            ├── Welcome.jsx / Login.jsx / Register.jsx
+            ├── Checkin.jsx       # Daily diary form
+            ├── Diary.jsx         # Entry history
+            ├── Chat.jsx          # AI chat UI
+            ├── Summary.jsx       # Weekly AI digest
+            ├── Profile.jsx / ProfileSetup.jsx / DoctorSetup.jsx
+            └── Alert.jsx         # Warning symptom overlay
 ```
 
-## Стек
+---
 
-- **React 19** + **Vite 8** — SPA без роутера, кастомная навигация через `useState`
-- **Inline CSS** — без UI-библиотек, собственная дизайн-система
-- **Yandex AI Studio** — чат-агент для ответов на вопросы о беременности
+## Tech stack
 
-## Статус
+| Layer | Tech |
+|-------|------|
+| Frontend | React 19, Vite 8 (beta), JSX, inline CSS — zero UI library dependencies |
+| Backend | Node.js 18+, Express 4, ES Modules |
+| Database | PostgreSQL 16, `node-postgres` (pg) |
+| Auth | JWT (access in memory · refresh in httpOnly cookie), bcrypt |
+| Validation | Zod 4 |
+| Security | Helmet, express-rate-limit, CORS |
+| AI | Yandex AI Studio (backend proxy) |
+| Infra | Docker Compose (3 services: frontend · backend · postgres) |
 
-Версия **v0.0.0.1** — MVP-прототип. Данные хранятся только в памяти браузера (теряются при перезагрузке). Backend и аутентификация в планах.
+---
 
-## Лицензия
+## License
 
 MIT
