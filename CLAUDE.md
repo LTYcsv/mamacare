@@ -29,6 +29,10 @@
 - Дневник: upsert по `(user_id, date)`, не INSERT.
 - Неделя беременности: диапазон 1–42.
 
+## Git
+
+- Никогда не добавлять `Co-Authored-By:` в сообщения коммитов.
+
 ---
 
 ## Obsidian Knowledge Vault
